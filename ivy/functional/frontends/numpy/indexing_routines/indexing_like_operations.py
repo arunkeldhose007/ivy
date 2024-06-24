@@ -1,8 +1,8 @@
 import ivy
 from ivy.functional.frontends.numpy.func_wrapper import (
     to_ivy_arrays_and_back,
-    outputs_to_numpy_arrays,
     inputs_to_ivy_arrays,
+    handle_numpy_out,
 )
 
 
@@ -26,7 +26,7 @@ def indices(dimensions, dtype=int, sparse=False):
     else:
         res = ivy.empty((N,) + dimensions, dtype=dtype)
     for i, dim in enumerate(dimensions):
-        idx = ivy.arange(dim, dtype=dtype).reshape(shape[:i] + (dim,) + shape[i + 1:])
+        idx = ivy.arange(dim, dtype=dtype).reshape(shape[:i] + (dim,) + shape[i + 1 :])
         if sparse:
             res = res + (idx,)
         else:
@@ -80,3 +80,21 @@ def diag(v, k=0):
 def diagonal(a, offset, axis1, axis2):
     return ivy.diagonal(a, offset=offset, axis1=axis1, axis2=axis2)
 
+
+@to_ivy_arrays_and_back
+@handle_numpy_out
+def compress(condition, a, axis=None, out=None):
+    condition_arr = ivy.asarray(condition).astype(bool)
+    if condition_arr.ndim != 1:
+        raise ivy.utils.exceptions.IvyException("Condition must be a 1D array")
+    if axis is None:
+        arr = ivy.asarray(a).flatten()
+        axis = 0
+    else:
+        arr = ivy.moveaxis(a, axis, 0)
+    if condition_arr.shape[0] > arr.shape[0]:
+        raise ivy.utils.exceptions.IvyException(
+            "Condition contains entries that are out of bounds"
+        )
+    arr = arr[: condition_arr.shape[0]]
+    return ivy.moveaxis(arr[condition_arr], 0, axis)
